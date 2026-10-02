@@ -18,7 +18,7 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 手に持ったアイテムからMMのアイテムをつくります。  
   
 - `newid:<newMMID>`  
-`<newMMID>`にあなたが新しく考えたMMIDを記述し.ymlファイルを生成します。  
+`<newMMID>`にあなたが新しく考えたMMIDを入力します。  
 
  
 - `filename:<filename.yml>`  
