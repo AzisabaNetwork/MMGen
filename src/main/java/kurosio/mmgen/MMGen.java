@@ -15,12 +15,15 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
 
@@ -74,10 +77,32 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (args.length < 3
+        if (args.length == 2
+                && args[0].equalsIgnoreCase("items")
+                && args[1].equalsIgnoreCase("info")) {
+
+            showItemInfo(player);
+
+            return true;
+        }
+
+
+        if (args.length == 2
+                && args[0].equalsIgnoreCase("items")
+                && args[1].equalsIgnoreCase("mmid")) {
+
+            showMythicId(player);
+
+            return true;
+        }
+
+
+        if (args.length < 2
                 || !args[0].equalsIgnoreCase("items")
                 || !args[1].equalsIgnoreCase("create")) {
+
             usage(player);
+
             return true;
         }
 
@@ -510,6 +535,418 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
         return true;
     }
 
+
+     //mmgen items info
+    private void showItemInfo(Player player) {
+
+        ItemStack item =
+                player.getInventory().getItemInMainHand();
+
+        if (item == null
+                || item.getType() == Material.AIR) {
+
+            player.sendMessage(color(
+                    "&c手にアイテムを持ってください。"
+            ));
+
+            return;
+        }
+
+        ItemMeta meta = item.getItemMeta();
+
+        player.sendMessage(color(
+                "&6&m------------------------------"
+        ));
+
+        player.sendMessage(color(
+                "&a&l[MMGen] &e&lアイテム情報"
+        ));
+
+        // MCID
+        player.sendMessage(color(
+                "&7MCID: &f" + item.getType().name()
+        ));
+
+        // MMID
+        String mythicId = getMythicItemId(item);
+
+        if (mythicId != null) {
+
+            player.sendMessage(color(
+                    "&7MMID: &a" + mythicId
+            ));
+
+            String mythicFile = findMythicItemFile(mythicId);
+
+            if (mythicFile != null) {
+
+                player.sendMessage(color(
+                        "&7File: &f" + mythicFile
+                ));
+
+            } else {
+
+                player.sendMessage(color(
+                        "&7File: &c見つかりませんでした"
+                ));
+            }
+
+        } else {
+
+            player.sendMessage(color(
+                    "&7MMID: &c取得できませんでした"
+            ));
+        }
+
+        // Display
+        if (meta != null
+                && meta.hasDisplayName()) {
+
+            player.sendMessage(color(
+                    "&7Display: &f"
+                            + meta.getDisplayName()
+            ));
+
+        } else {
+
+            player.sendMessage(color(
+                    "&7Display: &fなし"
+            ));
+        }
+
+        // CustomModelData
+        if (meta != null
+                && meta.hasCustomModelData()) {
+
+            player.sendMessage(color(
+                    "&7CustomModelData: &f"
+                            + meta.getCustomModelData()
+            ));
+
+        } else {
+
+            player.sendMessage(color(
+                    "&7CustomModelData: &fなし"
+            ));
+        }
+
+        // Lore
+        if (meta != null
+                && meta.hasLore()
+                && meta.getLore() != null
+                && !meta.getLore().isEmpty()) {
+
+            player.sendMessage(color(
+                    "&7Lore:"
+            ));
+
+            for (String line : meta.getLore()) {
+
+                player.sendMessage(
+                        "  " + line
+                );
+            }
+
+        } else {
+
+            player.sendMessage(color(
+                    "&7Lore: &fなし"
+            ));
+        }
+
+        player.sendMessage(color(
+                "&6&m------------------------------"
+        ));
+    }
+
+    private void showMythicId(Player player) {
+
+        ItemStack item =
+                player.getInventory().getItemInMainHand();
+
+        if (item == null
+                || item.getType() == Material.AIR) {
+
+            player.sendMessage(color(
+                    "&c手にアイテムを持ってください。"
+            ));
+
+            return;
+        }
+
+        String mythicId = getMythicItemId(item);
+
+        if (mythicId == null) {
+
+            player.sendMessage(color(
+                    "&cこのアイテムのMMIDを取得できませんでした。"
+            ));
+
+            return;
+        }
+
+        player.sendMessage(color(
+                "&aMMID: &f" + mythicId
+        ));
+    }
+
+
+    private String getMythicItemId(ItemStack item) {
+
+        if (item == null
+                || item.getType() == Material.AIR) {
+
+            return null;
+        }
+
+        try {
+
+            // MythicMobs本体
+            Class<?> mythicMobsClass =
+                    Class.forName(
+                            "io.lumine.xikage.mythicmobs.MythicMobs"
+                    );
+
+            // MythicMobs.inst()
+            Method instMethod =
+                    mythicMobsClass.getMethod("inst");
+
+            Object mythicMobs =
+                    instMethod.invoke(null);
+
+            // getItemManager()
+            Method getItemManagerMethod =
+                    mythicMobsClass.getMethod(
+                            "getItemManager"
+                    );
+
+            Object itemManager =
+                    getItemManagerMethod.invoke(mythicMobs);
+
+            // getItems()
+            Method getItemsMethod =
+                    itemManager.getClass().getMethod(
+                            "getItems"
+                    );
+
+            Object result =
+                    getItemsMethod.invoke(itemManager);
+
+            if (!(result instanceof Iterable)) {
+                return null;
+            }
+
+            // MythicItem
+            Class<?> mythicItemClass =
+                    Class.forName(
+                            "io.lumine.xikage.mythicmobs.items.MythicItem"
+                    );
+
+            Method getInternalNameMethod =
+                    mythicItemClass.getMethod(
+                            "getInternalName"
+                    );
+
+            Method generateItemStackMethod =
+                    mythicItemClass.getMethod(
+                            "generateItemStack",
+                            int.class
+                    );
+
+            // BukkitAdapter
+            Class<?> bukkitAdapterClass =
+                    Class.forName(
+                            "io.lumine.xikage.mythicmobs.adapters.bukkit.BukkitAdapter"
+                    );
+
+            Method adaptMethod =
+                    bukkitAdapterClass.getMethod(
+                            "adapt",
+                            Class.forName(
+                                    "io.lumine.xikage.mythicmobs.adapters.AbstractItemStack"
+                            )
+                    );
+
+            for (Object mythicItem : (Iterable<?>) result) {
+
+                // MMID
+                String internalName =
+                        (String) getInternalNameMethod.invoke(
+                                mythicItem
+                        );
+
+                // MythicItemからItemStackを生成
+                Object abstractItemStack =
+                        generateItemStackMethod.invoke(
+                                mythicItem,
+                                1
+                        );
+
+                if (abstractItemStack == null) {
+                    continue;
+                }
+
+                // Bukkit ItemStackへ変換
+                ItemStack generatedItem =
+                        (ItemStack) adaptMethod.invoke(
+                                null,
+                                abstractItemStack
+                        );
+
+                if (generatedItem == null) {
+                    continue;
+                }
+
+                // アイテム本体を比較
+                if (generatedItem.isSimilar(item)) {
+                    return internalName;
+                }
+            }
+
+        } catch (Exception e) {
+
+            getLogger().warning(
+                    "MythicMobsのMMID取得中にエラーが発生しました: "
+                            + e.getClass().getSimpleName()
+                            + ": "
+                            + e.getMessage()
+            );
+        }
+
+        return null;
+    }
+
+    private String findMythicItemFile(String mythicId) {
+
+        org.bukkit.plugin.Plugin mythicMobs =
+                getServer().getPluginManager().getPlugin("MythicMobs");
+
+        if (mythicMobs == null) {
+
+            getLogger().warning(
+                    "MythicMobsが見つかりません。"
+            );
+
+            return null;
+        }
+
+        File mythicItemsFolder =
+                new File(
+                        mythicMobs.getDataFolder(),
+                        "Items"
+                );
+
+        getLogger().info(
+                "MythicMobs Itemsフォルダ: "
+                        + mythicItemsFolder.getAbsolutePath()
+        );
+
+        if (!mythicItemsFolder.exists()
+                || !mythicItemsFolder.isDirectory()) {
+
+            getLogger().warning(
+                    "Itemsフォルダが存在しません: "
+                            + mythicItemsFolder.getAbsolutePath()
+            );
+
+            return null;
+        }
+
+        List<File> files = new ArrayList<>();
+
+        collectYamlFiles(
+                mythicItemsFolder,
+                files
+        );
+
+        getLogger().info(
+                "検索対象YAML数: "
+                        + files.size()
+        );
+
+        for (File file : files) {
+
+            YamlConfiguration yaml =
+                    YamlConfiguration.loadConfiguration(file);
+
+            for (String key : yaml.getKeys(false)) {
+
+                if (key.equalsIgnoreCase(mythicId)) {
+
+                    return getRelativePath(
+                            mythicItemsFolder,
+                            file
+                    );
+                }
+            }
+        }
+
+        getLogger().warning(
+                "MMIDの定義ファイルが見つかりません: "
+                        + mythicId
+        );
+
+        return null;
+    }
+
+    private void collectYamlFiles(
+            File folder,
+            List<File> files) {
+
+        File[] children = folder.listFiles();
+
+        if (children == null) {
+            return;
+        }
+
+        for (File child : children) {
+
+            if (child.isDirectory()) {
+
+                collectYamlFiles(
+                        child,
+                        files
+                );
+
+            } else if (child.isFile()
+                    && child.getName().toLowerCase(Locale.ROOT)
+                    .endsWith(".yml")) {
+
+                files.add(child);
+            }
+        }
+    }
+
+    private String getRelativePath(
+            File baseFolder,
+            File file) {
+
+        String basePath =
+                baseFolder.getAbsolutePath();
+
+        String filePath =
+                file.getAbsolutePath();
+
+        if (filePath.startsWith(basePath)) {
+
+            String relative =
+                    filePath.substring(
+                            basePath.length()
+                    );
+
+            if (relative.startsWith(File.separator)) {
+                relative = relative.substring(1);
+            }
+
+            return "Items/" + relative.replace(
+                    File.separatorChar,
+                    '/'
+            );
+        }
+
+        return file.getName();
+    }
+
     private void usage(Player player) {
         player.sendMessage(color(
                 "&e使用方法:"
@@ -524,6 +961,10 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
                         + " [filename:<filename.yml>]"
                         + " [options:<option>]"
                         + " [acm:<acm>]"
+        ));
+
+        player.sendMessage(color(
+                "&f/mmgen items [info/mmid]"
         ));
     }
 
@@ -595,6 +1036,8 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
                 && args[0].equalsIgnoreCase("items")) {
 
             list.add("create");
+            list.add("info");
+            list.add("mmid");
 
         } else if (args.length >= 3
                 && args[0].equalsIgnoreCase("items")
@@ -606,28 +1049,21 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             boolean options = false;
             boolean acm = false;
 
-
             for (int i = 2; i < args.length - 1; i++) {
-
                 String s =
                         args[i].toLowerCase(Locale.ROOT);
-
                 if (s.startsWith("filename:")) {
                     filename = true;
                 }
-
                 if (s.startsWith("newyml:")) {
                     newyml = true;
                 }
-
                 if (s.startsWith("newid:")) {
                     newid = true;
                 }
-
                 if (s.startsWith("options:")) {
                     options = true;
                 }
-
                 if (s.startsWith("acm:")) {
                     acm = true;
                 }
@@ -635,35 +1071,26 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
 
             if (current.startsWith("filename:")
                     && !filename) {
-
                 list.addAll(
                         getItemYamlFiles()
                 );
 
             } else if (current.startsWith("newyml:")
                     && !newyml) {
-
                 list.add("newyml:");
-
 
             } else if (current.startsWith("newid:")
                     && !newid) {
-
                 list.add("newid:");
-
 
             } else if (current.startsWith("options:")
                     && !options) {
-
                 list.add(
                         "options:Unbreakable"
                 );
-
             } else if (current.startsWith("acm:")
                     && !acm) {
-
                 list.add("acm:");
-
             } else if (current.isEmpty()) {
 
                 if (!newyml) {

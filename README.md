@@ -9,12 +9,12 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 
 
 ## コマンド集
-`/mmgen items create newyml:<name>`  
+### `/mmgen items create newyml:<name>`  
 /plugins/MMGen/items/ に`<name>.yml`が生成されます。  
 例：/mmgen items create newyml:kurosio-test.yml  
 →kurosio-test.ymlが作成されます。(中身は空)  
 
-`/mmgen items create newid:<newMMID> [filename:<filename.yml>] [options:<option>] [acm:<number>] `  
+### `/mmgen items create newid:<newMMID> [filename:<filename.yml>] [options:<option>] [acm:<number>] `  
 手に持ったアイテムからMMのアイテムをつくります。  
   
 - `newid:<newMMID>`  
@@ -30,6 +30,21 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 
  
 - `acm:<number>`デフォルトでは自動でCustomModelData値を読み取りしますが、入力することで別の番号を指定できます。
+  
+### `/mmgen items info`  
+手に持っているアイテムの情報を表示します。  
+#### 表示内容
+- MCID(id)
+- MMID
+- Fileの場所  
+- Display  
+- CustomModelDataの値
+- Lore
+
+### `/mmgen items mmid`  
+手に持っているMMアイテムのMMIDを表示します。  
+従来の`/mmid`では取得できなかったアイテムも表示することができます。(info同様)  
+
 
 ## アイテム作成のながれ・導入
 ①MMGen-x.x.x.jarをPluginsフォルダ内にアップロード  
