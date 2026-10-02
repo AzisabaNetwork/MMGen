@@ -45,7 +45,18 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 ⑧MMアイテムが完成  
 
 ※コマンドを実行したあとでも手に持っているアイテムは非MMアイテムです。  
-　コマンドを実行しても直接MMアイテムに変わるわけではありません。  
+　コマンドを実行しても直接MMアイテムに変わるわけではありません。 
+
+### 生成される.yml中身例
+`k_fan1:`  
+　`Id: GOLD_INGOT`  
+　`Display: '&r&9&l扇風機'`  
+　`Lore:`  
+　`- '&r&r&f扇風機の説明'`  
+  `Options:`  
+  　`Unbreakable: true`  
+  `Model: 30`  
+
 
 ### Licence
 This project is licensed under the GNU General Public License v3.0 (GPL-3.0).
