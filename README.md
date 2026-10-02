@@ -1,0 +1,57 @@
+# MMGen  
+#### 手に持ったアイテムをMMアイテムにするプラグイン
+
+## 概要  
+Minecraft上で手に持った非MMアイテムの   
+Display、Lore、CustomModelData値を読み取り、.ymlを生成  
+それをMMのフォルダにぶち込めばMMアイテムの完成。  
+※直接MMアイテムにするものではありません。
+
+
+## コマンド集
+`/mmgen items create newyml:<name>`  
+/plugins/MMGen/items/ に`<name>.yml`が生成されます。  
+例：/mmgen items create newyml:kurosio-test.yml  
+→kurosio-test.ymlが作成されます。(中身は空)  
+
+`/mmgen items create newid:<newMMID> [filename:<filename.yml>] [options:<option>] [acm:<number>] `  
+手に持ったアイテムからMMのアイテムをつくります。  
+  
+- `newid:<newMMID>`  
+`<newMMID>`にあなたが新しく考えたMMIDを記述し.ymlファイルを生成します。  
+
+ 
+- `filename:<filename.yml>`  
+`<filename.yml>`の部分に既存の.ymlを選択することで同じ.yml内に複数のMMアイテムの情報を記述していくことができます。  
+※filenameを入力しなかった場合はnewMMIDと同じ名前の.yml、MMアイテムが生成・記述されます。  
+
+ 
+- `options:<option>`Unbeakableを選択できます。これで不可解になります。  
+
+ 
+- `acm:<number>`デフォルトでは自動でCustomModelData値を読み取りしますが、入力することで別の番号を指定できます。
+
+## アイテム作成のながれ・導入
+①MMGen-x.x.x.jarをPluginsフォルダ内にアップロード  
+②サーバー内で`/plugman load MMGen-x.x.x` を実行  
+③手にMMアイテムにしたいアイテムを持ちます  
+④`/mmgen items create newyml<name>`を実行し、新規.ymlを生成します。  
+　.ymlは/plugins/MMGen/items 内に生成されます。  
+⑤`/mmgen items create newid:<newMMID> [filename:<filename.yml>] [options:<option>] `  
+　を実行し、指定.ymlファイルの中にMMアイテムをつくっていきます。  
+⑥できた.ymlファイルを/plugins/MythicMobs/Items/任意フォルダ  
+　の中にコピペしていきます。  
+⑦サーバー内で`/mm reload`を実行  
+⑧MMアイテムが完成  
+
+※コマンドを実行したあとでも手に持っているアイテムは非MMアイテムです。  
+　コマンドを実行しても直接MMアイテムに変わるわけではありません。  
+
+### Licence
+This project is licensed under the GNU General Public License v3.0 (GPL-3.0).
+
+See the LICENSE file for details.  
+
+### Softdependencies
+- MythicMobs
+　

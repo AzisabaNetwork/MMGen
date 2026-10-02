@@ -1,16 +1,16 @@
 name: MMGen
 version: 1.0.0
 main: kurosio.mmgen.MMGen
-api-version: '1.21.11'
-author: Kurosio
+api-version: '1.13'
+softdepend:
+  - MythicMobs
 
 commands:
   mmgen:
-    description: MythicMobs item generator
-    usage: /mmgen items create <newMMID> [options:<option>] [acm:<acm>]
-    permission: mmgen.use
+    description: Generate MythicMobs item YAML
+    usage: /mmgen items create newid:<newMMID> [options:<option>] [acm:<acm>]
 
 permissions:
   mmgen.use:
-    description: Allows using MMGen
+    description: Allows use of MMGen
     default: op
