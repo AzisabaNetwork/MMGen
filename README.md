@@ -11,7 +11,7 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 ## コマンド集
 ### `/mmgen items create newyml:<name>`  
 /plugins/MMGen/items/ に`<name>.yml`が生成されます。  
-例：/mmgen items create newyml:kurosio-test.yml  
+例：/mmgen items create newyml:kurosio-test  
 →kurosio-test.ymlが作成されます。(中身は空)  
 
 ### `/mmgen items create newid:<newMMID> [filename:<filename.yml>] [options:<option>] [acm:<number>] `  
@@ -72,7 +72,15 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
   　`Unbreakable: true`  
   `Model: 30`  
 
+### /mmgen items info でのMMID表示までの流れ  
+①手元のアイテム情報を取得  
+②MythicMobsのItemsフォルダ内を検索  
+③YAMLファイルを1つずつ精査、手元のアイテムと内容を比較  
+④条件が一致したMMIDを特定  
+⑤MMIDに対応するYAMLファイルを検索  
+⑥取得したDisplay,MMID,Model,Lore等の検索結果を表示  
 
+  
 ### Licence
 This project is licensed under the GNU General Public License v3.0 (GPL-3.0).
 

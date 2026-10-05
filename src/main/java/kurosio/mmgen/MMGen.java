@@ -691,129 +691,264 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
     }
 
 
+
     private String getMythicItemId(ItemStack item) {
 
-        if (item == null
-                || item.getType() == Material.AIR) {
-
+        if (item == null || item.getType() == Material.AIR) {
             return null;
         }
 
-        try {
+        // MythicMobsのItems内にあるYAMLを直接比較する
 
-            // MythicMobs本体
-            Class<?> mythicMobsClass =
-                    Class.forName(
-                            "io.lumine.xikage.mythicmobs.MythicMobs"
-                    );
+        org.bukkit.plugin.Plugin mythicMobs =
+                getServer().getPluginManager().getPlugin("MythicMobs");
 
-            // MythicMobs.inst()
-            Method instMethod =
-                    mythicMobsClass.getMethod("inst");
+        if (mythicMobs == null) {
+            return null;
+        }
 
-            Object mythicMobs =
-                    instMethod.invoke(null);
+        File mythicItemsFolder =
+                new File(mythicMobs.getDataFolder(), "Items");
 
-            // getItemManager()
-            Method getItemManagerMethod =
-                    mythicMobsClass.getMethod(
-                            "getItemManager"
-                    );
+        if (!mythicItemsFolder.isDirectory()) {
+            return null;
+        }
 
-            Object itemManager =
-                    getItemManagerMethod.invoke(mythicMobs);
+        List<File> files = new ArrayList<>();
+        collectYamlFiles(mythicItemsFolder, files);
 
-            // getItems()
-            Method getItemsMethod =
-                    itemManager.getClass().getMethod(
-                            "getItems"
-                    );
+        List<String> matchedIds = new ArrayList<>();
 
-            Object result =
-                    getItemsMethod.invoke(itemManager);
+        for (File file : files) {
 
-            if (!(result instanceof Iterable)) {
-                return null;
+            YamlConfiguration yaml =
+                    new YamlConfiguration();
+
+            try {
+                yaml.load(file);
+
+            } catch (Exception e) {
+                // 読み込めないYAMLは静かにスキップ
+                continue;
             }
 
-            // MythicItem
-            Class<?> mythicItemClass =
-                    Class.forName(
-                            "io.lumine.xikage.mythicmobs.items.MythicItem"
-                    );
+            for (String id : yaml.getKeys(false)) {
 
-            Method getInternalNameMethod =
-                    mythicItemClass.getMethod(
-                            "getInternalName"
-                    );
+                String path = id;
 
-            Method generateItemStackMethod =
-                    mythicItemClass.getMethod(
-                            "generateItemStack",
-                            int.class
-                    );
+                // MCID
+                String mythicMaterial = yaml.getString(path + ".Id");
 
-            // BukkitAdapter
-            Class<?> bukkitAdapterClass =
-                    Class.forName(
-                            "io.lumine.xikage.mythicmobs.adapters.bukkit.BukkitAdapter"
-                    );
-
-            Method adaptMethod =
-                    bukkitAdapterClass.getMethod(
-                            "adapt",
-                            Class.forName(
-                                    "io.lumine.xikage.mythicmobs.adapters.AbstractItemStack"
-                            )
-                    );
-
-            for (Object mythicItem : (Iterable<?>) result) {
-
-                // MMID
-                String internalName =
-                        (String) getInternalNameMethod.invoke(
-                                mythicItem
-                        );
-
-                // MythicItemからItemStackを生成
-                Object abstractItemStack =
-                        generateItemStackMethod.invoke(
-                                mythicItem,
-                                1
-                        );
-
-                if (abstractItemStack == null) {
+                if (mythicMaterial == null
+                        || !mythicMaterial.equalsIgnoreCase(
+                        item.getType().name())) {
                     continue;
                 }
 
-                // Bukkit ItemStackへ変換
-                ItemStack generatedItem =
-                        (ItemStack) adaptMethod.invoke(
-                                null,
-                                abstractItemStack
-                        );
+                ItemMeta meta = item.getItemMeta();
 
-                if (generatedItem == null) {
+                if (meta == null) {
                     continue;
                 }
 
-                // アイテム本体を比較
-                if (generatedItem.isSimilar(item)) {
-                    return internalName;
+                // Display：色・装飾コードを含めて厳密比較
+                String mythicDisplay =
+                        yaml.getString(path + ".Display");
+
+                String itemDisplay =
+                        meta.hasDisplayName()
+                                ? meta.getDisplayName()
+                                : null;
+
+                if (!sameDisplay(mythicDisplay, itemDisplay)) {
+                    continue;
                 }
+
+                // CustomModelData：Model / CustomModelData の両形式に対応
+                Integer mythicModel = getMythicModel(yaml, path);
+
+                Integer itemModel =
+                        meta.hasCustomModelData()
+                                ? meta.getCustomModelData()
+                                : null;
+
+                if (!sameValue(mythicModel, itemModel)) {
+                    continue;
+                }
+
+                // Enchantments
+                Set<String> mythicEnchants =
+                        getYamlStringSet(yaml, path + ".Enchantments");
+
+                Set<String> itemEnchants = new HashSet<>();
+
+                for (Map.Entry<Enchantment, Integer> entry
+                        : meta.getEnchants().entrySet()) {
+
+                    itemEnchants.add(
+                            entry.getKey().getName().toUpperCase(Locale.ROOT)
+                                    + ":" + entry.getValue()
+                    );
+                }
+
+                if (!mythicEnchants.equals(itemEnchants)) {
+                    continue;
+                }
+
+                // Hide
+                Set<String> mythicHide =
+                        getYamlStringSet(yaml, path + ".Hide");
+
+                Set<String> itemHide = new HashSet<>();
+
+                for (ItemFlag flag : meta.getItemFlags()) {
+                    String flagName = FLAGS.get(flag);
+
+                    if (flagName != null) {
+                        itemHide.add(flagName.toUpperCase(Locale.ROOT));
+                    }
+                }
+
+                if (!mythicHide.equals(itemHide)) {
+                    continue;
+                }
+
+// Unbreakable
+                boolean mythicUnbreakable =
+                        yaml.getBoolean(
+                                path + ".Options.Unbreakable",
+                                false
+                        );
+
+                boolean itemUnbreakable =
+                        meta.isUnbreakable();
+
+                if (mythicUnbreakable != itemUnbreakable) {
+                    continue;
+                }
+
+                matchedIds.add(id);
             }
+        }
 
-        } catch (Exception e) {
+        // 一致するMMIDが1つだけの場合に限り確定
+        if (matchedIds.size() == 1) {
+            return matchedIds.get(0);
+        }
 
+        if (matchedIds.size() > 1) {
             getLogger().warning(
-                    "MythicMobsのMMID取得中にエラーが発生しました: "
-                            + e.getClass().getSimpleName()
-                            + ": "
-                            + e.getMessage()
+                    "複数のMMアイテムが一致したため、MMIDを確定できません: "
+                            + matchedIds
             );
         }
 
         return null;
+    }
+
+    private String getMythicTypeFromNbt(ItemStack item) {
+
+        try {
+            Class<?> craftItemStackClass = Class.forName(
+                    "org.bukkit.craftbukkit.v1_15_R1.inventory.CraftItemStack"
+            );
+
+            Method asNmsCopyMethod =
+                    craftItemStackClass.getMethod(
+                            "asNMSCopy",
+                            ItemStack.class
+                    );
+
+            Object nmsItem =
+                    asNmsCopyMethod.invoke(null, item);
+
+            Method getTagMethod =
+                    nmsItem.getClass().getMethod("getTag");
+
+            Object nbtTag =
+                    getTagMethod.invoke(nmsItem);
+
+            if (nbtTag == null) {
+                return null;
+            }
+
+            Method getStringMethod =
+                    nbtTag.getClass().getMethod(
+                            "getString",
+                            String.class
+                    );
+
+            String value =
+                    (String) getStringMethod.invoke(
+                            nbtTag,
+                            "MYTHIC_TYPE"
+                    );
+
+            return value.isEmpty() ? null : value;
+
+        } catch (Exception e) {
+            // NBTを取得できない場合はYAML比較へ進む
+            return null;
+        }
+    }
+
+    private boolean sameDisplay(String mythicDisplay, String itemDisplay) {
+
+        if (mythicDisplay == null || itemDisplay == null) {
+            return mythicDisplay == null && itemDisplay == null;
+        }
+
+        return mythicDisplay.replace('§', '&')
+                .equals(itemDisplay.replace('§', '&'));
+    }
+
+
+    private boolean sameValue(Object first, Object second) {
+        if (first == null || second == null) {
+            return first == null && second == null;
+        }
+
+        return first.equals(second);
+    }
+
+
+    private Integer getMythicModel(YamlConfiguration yaml, String path) {
+
+        String[] paths = {
+                path + ".Model",
+                path + ".CustomModelData",
+                path + ".Options.Model",
+                path + ".Options.CustomModelData"
+        };
+
+        for (String modelPath : paths) {
+            if (yaml.contains(modelPath)) {
+                return yaml.getInt(modelPath);
+            }
+        }
+
+        return null;
+    }
+
+    private Set<String> getYamlStringSet(
+            YamlConfiguration yaml,
+            String path) {
+
+        Set<String> result = new HashSet<>();
+
+        List<String> values = yaml.getStringList(path);
+
+        for (String value : values) {
+            if (value == null) {
+                continue;
+            }
+
+            result.add(
+                    value.trim().toUpperCase(Locale.ROOT)
+            );
+        }
+
+        return result;
     }
 
     private String findMythicItemFile(String mythicId) {
@@ -866,8 +1001,20 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
 
         for (File file : files) {
 
-            YamlConfiguration yaml =
-                    YamlConfiguration.loadConfiguration(file);
+            YamlConfiguration yaml = new YamlConfiguration();
+
+            try {
+                yaml.load(file);
+
+            } catch (Exception e) {
+
+                getLogger().warning(
+                        "YAMLの構文エラーのため検索をスキップします: "
+                                + file.getName()
+                );
+
+                continue;
+            }
 
             for (String key : yaml.getKeys(false)) {
 
