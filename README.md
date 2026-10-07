@@ -5,7 +5,10 @@
 Minecraft上で手に持った非MMアイテムの   
 Display、Lore、CustomModelData値を読み取り、.ymlを生成  
 それをMMのフォルダにぶち込めばMMアイテムの完成。  
-※直接MMアイテムにするものではありません。
+※直接MMアイテムにするものではありません。  
+
+このプラグインで作成したMMアイテムはデフォルトで  
+空スキル(delay 0)を記述するため、/mmidでもMMIDが判別できるようになります。 
 
 
 ## コマンド集
@@ -26,7 +29,8 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 ※filenameを入力しなかった場合はnewMMIDと同じ名前の.yml、MMアイテムが生成・記述されます。  
 
  
-- `options:<option>`Unbeakableを選択できます。これで不可解になります。  
+- `options:<option>`Unbeakableを選択できます。これで不可解になります。   
+Empty-skill-offで空スキルをつけないように設定できます。  
 
  
 - `acm:<number>`デフォルトでは自動でCustomModelData値を読み取りしますが、入力することで別の番号を指定できます。
@@ -44,6 +48,16 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 ### `/mmgen items mmid`  
 手に持っているMMアイテムのMMIDを表示します。  
 従来の`/mmid`では取得できなかったアイテムも表示することができます。(info同様)  
+
+### `/mmgen items insert-empty-skill`  
+手に持っているMMアイテムに空スキルを挿入します。  
+①スキルがついていないMMアイテムを手にもつ  
+②コマンドを実行  
+③ファイル場所やDIsplay等を確認する。  
+④[メッセージクリック]で該当yml内が編集され、空スキル(delay 0)が付与  
+⑤/mm reload実行で完成  
+⑥/mm items giveコマンドで出して確認  
+※同じDisplay、Lore等内部情報が同じの場合は付与できません。
 
 
 ## アイテム作成のながれ・導入

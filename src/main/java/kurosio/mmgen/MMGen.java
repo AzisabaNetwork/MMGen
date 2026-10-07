@@ -28,6 +28,7 @@ import java.util.Set;
 public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
 
     private File itemsFolder;
+    private EmptySkillManager emptySkillManager;
 
     private static final Map<ItemFlag, String> FLAGS = new HashMap<>();
 
@@ -42,6 +43,8 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
     @Override
     public void onEnable() {
         itemsFolder = new File(getDataFolder(), "items");
+
+        emptySkillManager = new EmptySkillManager(this);
 
         if (!itemsFolder.exists() && !itemsFolder.mkdirs()) {
             getLogger().severe("itemsフォルダを作成できませんでした。");
@@ -92,6 +95,28 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
                 && args[1].equalsIgnoreCase("mmid")) {
 
             showMythicId(player);
+
+            return true;
+        }
+
+        if (args.length == 2
+                && args[0].equalsIgnoreCase("items")
+                && args[1].equalsIgnoreCase("insert-empty-skill")) {
+
+            emptySkillManager.request(player);
+
+            return true;
+        }
+
+        if (args.length == 4
+                && args[0].equalsIgnoreCase("items")
+                && args[1].equalsIgnoreCase("insert-empty-skill")
+                && args[2].equalsIgnoreCase("confirm")) {
+
+            emptySkillManager.confirm(
+                    player,
+                    args[3]
+            );
 
             return true;
         }
@@ -252,6 +277,10 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
 
                     if (option.equalsIgnoreCase("Unbreakable")) {
                         // 後でOptions.Unbreakable=trueにする
+
+                    } else if (option.equalsIgnoreCase("Empty-skill-off")) {
+                        // 後でSkills: []を付けない
+
                     } else {
                         player.sendMessage(color(
                                 "&c未対応のオプション: &f" + option
@@ -305,6 +334,7 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
         }
 
         boolean forceUnbreakable = false;
+        boolean emptySkillOff = false;
         Integer model = null;
 
 
@@ -321,6 +351,9 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
 
                     if (option.equalsIgnoreCase("Unbreakable")) {
                         forceUnbreakable = true;
+
+                    } else if (option.equalsIgnoreCase("Empty-skill-off")) {
+                        emptySkillOff = true;
                     }
                 }
 
@@ -487,6 +520,17 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             yaml.set(
                     path + ".Model",
                     model
+            );
+        }
+
+        // デフォルトで空スキルを付与
+        if (!emptySkillOff) {
+            List<String> skills = new ArrayList<>();
+            skills.add("delay 0");
+
+            yaml.set(
+                    path + ".Skills",
+                    skills
             );
         }
 
@@ -692,7 +736,7 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
 
 
 
-    private String getMythicItemId(ItemStack item) {
+    String getMythicItemId(ItemStack item) {
 
         if (item == null || item.getType() == Material.AIR) {
             return null;
@@ -951,7 +995,7 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
         return result;
     }
 
-    private String findMythicItemFile(String mythicId) {
+    String findMythicItemFile(String mythicId) {
 
         org.bukkit.plugin.Plugin mythicMobs =
                 getServer().getPluginManager().getPlugin("MythicMobs");
@@ -1036,6 +1080,41 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
         return null;
     }
 
+    File getMythicItemFile(String relativePath) {
+
+        org.bukkit.plugin.Plugin mythicMobs =
+                getServer().getPluginManager().getPlugin("MythicMobs");
+
+        if (mythicMobs == null) {
+            return null;
+        }
+
+        File mythicItemsFolder =
+                new File(
+                        mythicMobs.getDataFolder(),
+                        "Items"
+                );
+
+
+        String path = relativePath;
+
+        if (path.startsWith("Items/")) {
+            path = path.substring("Items/".length());
+        }
+
+        if (path.contains("..")
+                || path.contains("\\")
+                || path.startsWith("/")) {
+
+            return null;
+        }
+
+        return new File(
+                mythicItemsFolder,
+                path
+        );
+    }
+
     private void collectYamlFiles(
             File folder,
             List<File> files) {
@@ -1111,12 +1190,12 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
         ));
 
         player.sendMessage(color(
-                "&f/mmgen items [info/mmid]"
+                "&f/mmgen items [info/mmid/insert-empty-skill]"
         ));
     }
 
 
-    private String color(String text) {
+    public String color(String text) {
         return text.replace('&', '§');
     }
 
@@ -1185,6 +1264,7 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             list.add("create");
             list.add("info");
             list.add("mmid");
+            list.add("insert-empty-skill");
 
         } else if (args.length >= 3
                 && args[0].equalsIgnoreCase("items")
@@ -1196,53 +1276,112 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             boolean options = false;
             boolean acm = false;
 
+            // すでに使用されている引数を確認
             for (int i = 2; i < args.length - 1; i++) {
+
                 String s =
                         args[i].toLowerCase(Locale.ROOT);
+
                 if (s.startsWith("filename:")) {
                     filename = true;
                 }
+
                 if (s.startsWith("newyml:")) {
                     newyml = true;
                 }
+
                 if (s.startsWith("newid:")) {
                     newid = true;
                 }
+
                 if (s.startsWith("options:")) {
                     options = true;
                 }
+
                 if (s.startsWith("acm:")) {
                     acm = true;
                 }
             }
 
-            if (current.startsWith("filename:")
+            if (current.startsWith("options:")) {
+
+                String optionValue =
+                        current.substring("options:".length());
+
+                // すでに入力されているオプションを取得
+                String[] selectedOptions =
+                        optionValue.split(",", -1);
+
+                boolean hasUnbreakable = false;
+                boolean hasEmptySkillOff = false;
+
+                for (String option : selectedOptions) {
+
+                    if (option.equalsIgnoreCase("unbreakable")) {
+                        hasUnbreakable = true;
+                    }
+
+                    if (option.equalsIgnoreCase("empty-skill-off")) {
+                        hasEmptySkillOff = true;
+                    }
+                }
+
+                if (optionValue.endsWith(",")) {
+
+                    if (!hasUnbreakable) {
+                        list.add(
+                                current + "Unbreakable"
+                        );
+                    }
+
+                    if (!hasEmptySkillOff) {
+                        list.add(
+                                current + "Empty-skill-off"
+                        );
+                    }
+
+                } else if (selectedOptions.length == 1
+                        && selectedOptions[0].isEmpty()) {
+
+                    // options: の直後
+
+                    list.add(
+                            "options:Unbreakable"
+                    );
+
+                    list.add(
+                            "options:Empty-skill-off"
+                    );
+                }
+
+            } else if (current.startsWith("filename:")
                     && !filename) {
+
                 list.addAll(
                         getItemYamlFiles()
                 );
 
             } else if (current.startsWith("newyml:")
                     && !newyml) {
+
                 list.add("newyml:");
 
             } else if (current.startsWith("newid:")
                     && !newid) {
+
                 list.add("newid:");
 
-            } else if (current.startsWith("options:")
-                    && !options) {
-                list.add(
-                        "options:Unbreakable"
-                );
             } else if (current.startsWith("acm:")
                     && !acm) {
+
                 list.add("acm:");
+
             } else if (current.isEmpty()) {
 
                 if (!newyml) {
                     list.add("newyml:");
                 }
+
                 if (!filename) {
                     list.add("filename:");
                 }
@@ -1252,9 +1391,7 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
                 }
 
                 if (!options) {
-                    list.add(
-                            "options:Unbreakable"
-                    );
+                    list.add("options:");
                 }
 
                 if (!acm) {
