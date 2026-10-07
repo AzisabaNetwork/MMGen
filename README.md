@@ -8,7 +8,7 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 ※直接MMアイテムにするものではありません。  
 
 このプラグインで作成したMMアイテムはデフォルトで  
-空スキル(delay 0)を記述するため、/mmidでもMMIDが判別できるようになります。 
+空スキル(delay 0)を追加します。そのため、/mmidでもMMIDが判別できるようになります。 
 
 
 ## コマンド集
@@ -85,6 +85,9 @@ Empty-skill-offで空スキルをつけないように設定できます。
   `Options:`  
   　`Unbreakable: true`  
   `Model: 30`  
+`Skills:`  
+　`delay 0`
+
 
 ### /mmgen items info でのMMID表示までの流れ  
 ①手元のアイテム情報を取得  
