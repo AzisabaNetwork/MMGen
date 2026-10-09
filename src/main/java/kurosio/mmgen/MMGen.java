@@ -29,6 +29,7 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
 
     private File itemsFolder;
     private EmptySkillManager emptySkillManager;
+    private ItemOptionsManager itemOptionsManager;
 
     private static final Map<ItemFlag, String> FLAGS = new HashMap<>();
 
@@ -45,6 +46,7 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
         itemsFolder = new File(getDataFolder(), "items");
 
         emptySkillManager = new EmptySkillManager(this);
+        itemOptionsManager = new ItemOptionsManager(this);
 
         if (!itemsFolder.exists() && !itemsFolder.mkdirs()) {
             getLogger().severe("itemsフォルダを作成できませんでした。");
@@ -99,25 +101,47 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        if (args.length == 2
+
+        // /mmgen items insert empty-skill
+        if (args.length == 3
                 && args[0].equalsIgnoreCase("items")
-                && args[1].equalsIgnoreCase("insert-empty-skill")) {
+                && args[1].equalsIgnoreCase("insert")
+                && args[2].equalsIgnoreCase("empty-skill")) {
 
             emptySkillManager.request(player);
-
             return true;
         }
 
+// /mmgen items insert empty-skill confirm <token>
+        if (args.length == 5
+                && args[0].equalsIgnoreCase("items")
+                && args[1].equalsIgnoreCase("insert")
+                && args[2].equalsIgnoreCase("empty-skill")
+                && args[3].equalsIgnoreCase("confirm")) {
+
+            emptySkillManager.confirm(player, args[4]);
+            return true;
+        }
+
+// /mmgen items insert options:Unbreakable
+// /mmgen items insert options:AppendType
+        if (args.length == 3
+                && args[0].equalsIgnoreCase("items")
+                && args[1].equalsIgnoreCase("insert")
+                && args[2].toLowerCase(Locale.ROOT).startsWith("options:")) {
+
+            String options = args[2].substring("options:".length());
+            itemOptionsManager.request(player, options);
+            return true;
+        }
+
+// /mmgen items insert confirm <token>
         if (args.length == 4
                 && args[0].equalsIgnoreCase("items")
-                && args[1].equalsIgnoreCase("insert-empty-skill")
+                && args[1].equalsIgnoreCase("insert")
                 && args[2].equalsIgnoreCase("confirm")) {
 
-            emptySkillManager.confirm(
-                    player,
-                    args[3]
-            );
-
+            itemOptionsManager.confirm(player, args[3]);
             return true;
         }
 
@@ -334,7 +358,6 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
         }
 
         boolean forceUnbreakable = false;
-        boolean emptySkillOff = false;
         Integer model = null;
 
 
@@ -352,8 +375,6 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
                     if (option.equalsIgnoreCase("Unbreakable")) {
                         forceUnbreakable = true;
 
-                    } else if (option.equalsIgnoreCase("Empty-skill-off")) {
-                        emptySkillOff = true;
                     }
                 }
 
@@ -523,16 +544,8 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             );
         }
 
-        // デフォルトで空スキルを付与
-        if (!emptySkillOff) {
-            List<String> skills = new ArrayList<>();
-            skills.add("delay 0");
-
-            yaml.set(
-                    path + ".Skills",
-                    skills
-            );
-        }
+        // デフォルトで AppendType を有効化
+        yaml.set(path + ".Options.AppendType", true);
 
 
         try {
@@ -1190,7 +1203,11 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
         ));
 
         player.sendMessage(color(
-                "&f/mmgen items [info/mmid/insert-empty-skill]"
+                "&f/mmgen items [info/mmid/insert]"
+        ));
+
+        player.sendMessage(color(
+                "&f/mmgen items insert [empty-skill/options:Unbreakable/options:AppendType]"
         ));
     }
 
@@ -1238,6 +1255,7 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
         return files;
     }
 
+
     @Override
     public List<String> onTabComplete(CommandSender sender,
                                       Command command,
@@ -1248,25 +1266,103 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             return Collections.emptyList();
         }
 
-        String current =
-                args[args.length - 1]
-                        .toLowerCase(Locale.ROOT);
-
         List<String> list = new ArrayList<>();
 
+        String current = args[args.length - 1];
+        String lowerCurrent = current.toLowerCase(Locale.ROOT);
+
+        // /mmgen
         if (args.length == 1) {
-
             list.add("items");
+        }
 
-        } else if (args.length == 2
+        // /mmgen items
+        else if (args.length == 2
                 && args[0].equalsIgnoreCase("items")) {
 
             list.add("create");
             list.add("info");
             list.add("mmid");
-            list.add("insert-empty-skill");
+            list.add("insert");
+        }
 
-        } else if (args.length >= 3
+        // /mmgen items insert
+        else if (args.length == 3
+                && args[0].equalsIgnoreCase("items")
+                && args[1].equalsIgnoreCase("insert")) {
+
+            if ("empty-skill".startsWith(lowerCurrent)) {
+                list.add("empty-skill");
+            }
+
+            if ("options:".startsWith(lowerCurrent)
+                    || lowerCurrent.startsWith("options:")) {
+
+                String optionValue = "";
+
+                if (lowerCurrent.startsWith("options:")) {
+                    optionValue =
+                            current.substring("options:".length());
+                }
+
+                String[] selectedOptions =
+                        optionValue.split(",", -1);
+
+                String lastOption =
+                        selectedOptions[selectedOptions.length - 1];
+
+                boolean hasUnbreakable = false;
+                boolean hasAppendType = false;
+
+                for (String option : selectedOptions) {
+                    if (option.equalsIgnoreCase("Unbreakable")) {
+                        hasUnbreakable = true;
+                    }
+
+                    if (option.equalsIgnoreCase("AppendType")) {
+                        hasAppendType = true;
+                    }
+                }
+
+                // options: の直後、またはカンマの直後
+                if (lastOption.isEmpty()) {
+                    if (!hasUnbreakable) {
+                        list.add(current + "Unbreakable");
+                    }
+
+                    if (!hasAppendType) {
+                        list.add(current + "AppendType");
+                    }
+                }
+
+                // オプション名を入力途中の場合
+                else {
+                    if (!hasUnbreakable
+                            && "Unbreakable".toLowerCase(Locale.ROOT)
+                            .startsWith(lastOption.toLowerCase(Locale.ROOT))) {
+                        list.add(
+                                current.substring(
+                                        0, current.length() - lastOption.length()
+                                ) + "Unbreakable"
+                        );
+                    }
+
+                    if (!hasAppendType
+                            && "AppendType".toLowerCase(Locale.ROOT)
+                            .startsWith(lastOption.toLowerCase(Locale.ROOT))) {
+                        list.add(
+                                current.substring(
+                                        0, current.length() - lastOption.length()
+                                ) + "AppendType"
+                        );
+                    }
+                }
+            }
+        }
+
+
+        // /mmgen items create
+        else if (args.length >= 3
                 && args[0].equalsIgnoreCase("items")
                 && args[1].equalsIgnoreCase("create")) {
 
@@ -1276,11 +1372,9 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             boolean options = false;
             boolean acm = false;
 
-            // すでに使用されている引数を確認
+            // すでに指定されている引数を確認
             for (int i = 2; i < args.length - 1; i++) {
-
-                String s =
-                        args[i].toLowerCase(Locale.ROOT);
+                String s = args[i].toLowerCase(Locale.ROOT);
 
                 if (s.startsWith("filename:")) {
                     filename = true;
@@ -1303,81 +1397,73 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
                 }
             }
 
-            if (current.startsWith("options:")) {
+            if (lowerCurrent.startsWith("options:")) {
 
                 String optionValue =
                         current.substring("options:".length());
 
-                // すでに入力されているオプションを取得
                 String[] selectedOptions =
                         optionValue.split(",", -1);
 
+                String lastOption =
+                        selectedOptions[selectedOptions.length - 1];
+
                 boolean hasUnbreakable = false;
-                boolean hasEmptySkillOff = false;
 
                 for (String option : selectedOptions) {
-
-                    if (option.equalsIgnoreCase("unbreakable")) {
+                    if (option.equalsIgnoreCase("Unbreakable")) {
                         hasUnbreakable = true;
                     }
-
-                    if (option.equalsIgnoreCase("empty-skill-off")) {
-                        hasEmptySkillOff = true;
-                    }
                 }
 
-                if (optionValue.endsWith(",")) {
-
+                // options: の直後、またはカンマの直後
+                if (lastOption.isEmpty()) {
                     if (!hasUnbreakable) {
-                        list.add(
-                                current + "Unbreakable"
-                        );
+                        list.add(current + "Unbreakable");
                     }
-
-                    if (!hasEmptySkillOff) {
-                        list.add(
-                                current + "Empty-skill-off"
-                        );
-                    }
-
-                } else if (selectedOptions.length == 1
-                        && selectedOptions[0].isEmpty()) {
-
-                    // options: の直後
-
-                    list.add(
-                            "options:Unbreakable"
-                    );
-
-                    list.add(
-                            "options:Empty-skill-off"
-                    );
                 }
 
-            } else if (current.startsWith("filename:")
-                    && !filename) {
+                // Unbreakable の入力途中
+                else {
+                    String prefix =
+                            current.substring(
+                                    0, current.length() - lastOption.length()
+                            );
 
-                list.addAll(
-                        getItemYamlFiles()
-                );
+                    if (!hasUnbreakable
+                            && "Unbreakable".toLowerCase(Locale.ROOT)
+                            .startsWith(lastOption.toLowerCase(Locale.ROOT))) {
 
-            } else if (current.startsWith("newyml:")
-                    && !newyml) {
+                        list.add(prefix + "Unbreakable");
+                    }
+                }
+            }
 
-                list.add("newyml:");
+            else if (lowerCurrent.startsWith("filename:")) {
+                if (!filename) {
+                    list.addAll(getItemYamlFiles());
+                }
+            }
 
-            } else if (current.startsWith("newid:")
-                    && !newid) {
+            else if (lowerCurrent.startsWith("newyml:")) {
+                if (!newyml) {
+                    list.add("newyml:");
+                }
+            }
 
-                list.add("newid:");
+            else if (lowerCurrent.startsWith("newid:")) {
+                if (!newid) {
+                    list.add("newid:");
+                }
+            }
 
-            } else if (current.startsWith("acm:")
-                    && !acm) {
+            else if (lowerCurrent.startsWith("acm:")) {
+                if (!acm) {
+                    list.add("acm:");
+                }
+            }
 
-                list.add("acm:");
-
-            } else if (current.isEmpty()) {
-
+            else if (current.isEmpty()) {
                 if (!newyml) {
                     list.add("newyml:");
                 }
@@ -1400,14 +1486,12 @@ public class MMGen extends JavaPlugin implements CommandExecutor, TabCompleter {
             }
         }
 
+        // 入力中の文字列に一致する候補だけを返す
         List<String> result = new ArrayList<>();
 
         for (String suggestion : list) {
-
-            if (suggestion
-                    .toLowerCase(Locale.ROOT)
-                    .startsWith(current)) {
-
+            if (suggestion.toLowerCase(Locale.ROOT)
+                    .startsWith(lowerCurrent)) {
                 result.add(suggestion);
             }
         }

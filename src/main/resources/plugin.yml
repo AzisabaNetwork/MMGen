@@ -1,5 +1,5 @@
 name: MMGen
-version: 3.0.0
+version: 4.0.0
 main: kurosio.mmgen.MMGen
 api-version: '1.13'
 softdepend:

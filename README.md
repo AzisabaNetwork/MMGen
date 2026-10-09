@@ -7,8 +7,8 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 それをMMのフォルダにぶち込めばMMアイテムの完成。  
 ※直接MMアイテムにするものではありません。  
 
-このプラグインで作成したMMアイテムはデフォルトで  
-空スキル(delay 0)を追加します。そのため、/mmidでもMMIDが判別できるようになります。 
+このプラグインで作成したMMアイテムはデフォルトでOptionsに  
+AppendType:trueを付与します。そのため、/mmidでもMMIDが判別できるようになります。 
 
 
 ## コマンド集
@@ -29,8 +29,7 @@ Display、Lore、CustomModelData値を読み取り、.ymlを生成
 ※filenameを入力しなかった場合はnewMMIDと同じ名前の.yml、MMアイテムが生成・記述されます。  
 
  
-- `options:<option>`Unbeakableを選択できます。これで不可解になります。   
-Empty-skill-offで空スキルをつけないように設定できます。  
+- `options:<option>`Unbeakableを選択できます。これで不可解になります。    
 
  
 - `acm:<number>`デフォルトでは自動でCustomModelData値を読み取りしますが、入力することで別の番号を指定できます。
@@ -49,7 +48,7 @@ Empty-skill-offで空スキルをつけないように設定できます。
 手に持っているMMアイテムのMMIDを表示します。  
 従来の`/mmid`では取得できなかったアイテムも表示することができます。(info同様)  
 
-### `/mmgen items insert-empty-skill`  
+### `/mmgen items insert empty-skill`  
 手に持っているMMアイテムに空スキルを挿入します。  
 ※既存アイテムに実行するとFIXが必要になるため実行は要注意  
 ①スキルがついていないMMアイテムを手にもつ  
@@ -58,7 +57,18 @@ Empty-skill-offで空スキルをつけないように設定できます。
 ④[メッセージクリック]で該当yml内が編集され、空スキル(delay 0)が付与  
 ⑤/mm reload実行で完成  
 ⑥/mm items giveコマンドで出して確認  
-※同じDisplay、Lore等内部情報が同じの場合は付与できません。
+※同じDisplay、Lore等内部情報が複数存在する場合は付与できません。  
+
+### `/mmgen items insert options:Unbreakable/AppendType`  
+手に持っているMMアイテムに空スキルを挿入します。  
+※既存アイテムに実行するとFIXが必要になるため実行は要注意  
+①スキルがついていないMMアイテムを手にもつ  
+②コマンドを実行  
+③ファイル場所やDIsplay等を確認する。  
+④[メッセージクリック]で該当yml内が編集され、各optionが付与  
+⑤/mm reload実行で完成  
+⑥/mm items giveコマンドで出して確認  
+※同じDisplay、Lore等内部情報が複数存在する場合は付与できません。
 
 
 ## アイテム作成のながれ・導入
@@ -84,10 +94,9 @@ Empty-skill-offで空スキルをつけないように設定できます。
 　`Lore:`  
 　`- '&r&r&f扇風機の説明'`  
   `Options:`  
-  　`Unbreakable: true`  
-  `Model: 30`  
-`Skills:`  
-　`delay 0`
+　`Unbreakable: true`  
+　`AppendType: true`  
+  `Model: 30`
 
 
 ### /mmgen items info でのMMID表示までの流れ  
@@ -104,6 +113,6 @@ This project is licensed under the GNU General Public License v3.0 (GPL-3.0).
 
 See the LICENSE file for details.  
 
-### Softdependencies
-- MythicMobs
+### Dependencies
+- MythicMobs (4.12.0)
 　

@@ -4,8 +4,8 @@ import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.ComponentBuilder;
 import net.md_5.bungee.api.chat.HoverEvent;
 import net.md_5.bungee.api.chat.HoverEvent.Action;
-import org.bukkit.entity.Player;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -13,33 +13,47 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class EmptySkillManager {
+public class ItemOptionsManager {
 
     private final MMGen plugin;
 
     private final Map<UUID, PendingInsert> pending =
             new HashMap<>();
 
-    public EmptySkillManager(MMGen plugin) {
+    public ItemOptionsManager(MMGen plugin) {
         this.plugin = plugin;
     }
 
-    public void request(Player player) {
+    public void request(Player player, String option) {
+
+        String normalizedOption = normalizeOption(option);
+
+        if (normalizedOption == null) {
+            player.sendMessage(
+                    plugin.color(
+                            "&c対応していないオプションです。"
+                    )
+            );
+            player.sendMessage(
+                    plugin.color(
+                            "&7使用可能: Unbreakable, AppendType"
+                    )
+            );
+            return;
+        }
 
         ItemStack item =
                 player.getInventory().getItemInMainHand();
 
-        if (item == null
-                || item.getType().isAir()) {
-
+        if (item == null || item.getType().isAir()) {
             player.sendMessage(
-                    plugin.color("&c手にアイテムを持ってください。")
+                    plugin.color(
+                            "&c手にアイテムを持ってください。"
+                    )
             );
-
             return;
         }
 
@@ -47,13 +61,11 @@ public class EmptySkillManager {
                 plugin.getMythicItemId(item);
 
         if (mythicId == null) {
-
             player.sendMessage(
                     plugin.color(
                             "&cこのアイテムのMMIDを取得できませんでした。"
                     )
             );
-
             return;
         }
 
@@ -61,27 +73,23 @@ public class EmptySkillManager {
                 plugin.findMythicItemFile(mythicId);
 
         if (filePath == null) {
-
             player.sendMessage(
                     plugin.color(
                             "&cMMIDの定義ファイルを見つけられませんでした。"
                     )
             );
-
             return;
         }
 
         File file =
                 plugin.getMythicItemFile(filePath);
 
-        if (file == null || !file.exists()) {
-
+        if (file == null || !file.isFile()) {
             player.sendMessage(
                     plugin.color(
                             "&c対象YAMLファイルを見つけられませんでした。"
                     )
             );
-
             return;
         }
 
@@ -90,15 +98,36 @@ public class EmptySkillManager {
 
         try {
             yaml.load(file);
-
         } catch (Exception e) {
-
             player.sendMessage(
                     plugin.color(
                             "&c対象YAMLを読み込めませんでした。"
                     )
             );
+            return;
+        }
 
+        String optionPath =
+                mythicId + ".Options." + normalizedOption;
+
+        /*
+         * true / false の値にかかわらず、
+         * 対象キーが既に存在すれば変更しない。
+         */
+        if (yaml.contains(optionPath)) {
+            player.sendMessage(
+                    plugin.color(
+                            "&cこのアイテムには既にOptions."
+                                    + normalizedOption
+                                    + "が記述されています。"
+                    )
+            );
+
+            player.sendMessage(
+                    plugin.color(
+                            "&7既存の設定は変更していません。"
+                    )
+            );
             return;
         }
 
@@ -112,7 +141,7 @@ public class EmptySkillManager {
 
         player.sendMessage(
                 plugin.color(
-                        "&a&l[MMGen] &e&l空スキル挿入"
+                        "&a&l[MMGen] &e&lOptions挿入"
                 )
         );
 
@@ -128,18 +157,22 @@ public class EmptySkillManager {
                 )
         );
 
-        if (meta != null
-                && meta.hasDisplayName()) {
+        player.sendMessage(
+                plugin.color(
+                        "&7Option: &f"
+                                + normalizedOption
+                                + ": true"
+                )
+        );
 
+        if (meta != null && meta.hasDisplayName()) {
             player.sendMessage(
                     plugin.color(
                             "&7Display: &f"
                                     + meta.getDisplayName()
                     )
             );
-
         } else {
-
             player.sendMessage(
                     plugin.color(
                             "&7Display: &fなし"
@@ -157,14 +190,10 @@ public class EmptySkillManager {
             );
 
             for (String line : meta.getLore()) {
-
-                player.sendMessage(
-                        "  " + line
-                );
+                player.sendMessage("  " + line);
             }
 
         } else {
-
             player.sendMessage(
                     plugin.color(
                             "&7Lore: &fなし"
@@ -178,23 +207,7 @@ public class EmptySkillManager {
                 )
         );
 
-        /*
-         * すでにスキルがある場合はここで終了。
-         * YAML自体は変更しない。
-         */
-        if (hasActualSkills(yaml, mythicId)) {
-
-            player.sendMessage(
-                    plugin.color(
-                            "&eこのアイテムには既にスキルが設定されています。"
-                    )
-            );
-
-            return;
-        }
-
-        UUID token =
-                UUID.randomUUID();
+        UUID token = UUID.randomUUID();
 
         pending.put(
                 player.getUniqueId(),
@@ -202,25 +215,28 @@ public class EmptySkillManager {
                         token,
                         mythicId,
                         filePath,
-                        item.clone()
+                        normalizedOption
                 )
         );
 
-        /*
-         * クリック可能な確認メッセージ
-         */
         player.spigot().sendMessage(
                 new ComponentBuilder(
-                        "このアイテムに空スキルを挿入してもよろしいですか？ "
+                        "Options."
+                                + normalizedOption
+                                + ": true を追加しますか？ "
                 )
-                        .color(net.md_5.bungee.api.ChatColor.YELLOW)
+                        .color(
+                                net.md_5.bungee.api.ChatColor.YELLOW
+                        )
                         .append("[クリックして挿入]")
-                        .color(net.md_5.bungee.api.ChatColor.GREEN)
+                        .color(
+                                net.md_5.bungee.api.ChatColor.GREEN
+                        )
                         .bold(true)
                         .event(
                                 new ClickEvent(
                                         ClickEvent.Action.RUN_COMMAND,
-                                        "/mmgen items insert empty-skill confirm "
+                                        "/mmgen items insert confirm "
                                                 + token
                                 )
                         )
@@ -228,104 +244,75 @@ public class EmptySkillManager {
                                 new HoverEvent(
                                         Action.SHOW_TEXT,
                                         new ComponentBuilder(
-                                                "クリックしてSkillsにdelay 0を追加"
+                                                "クリックしてOptions."
+                                                        + normalizedOption
+                                                        + ": true を追加"
                                         ).create()
                                 )
                         )
                         .create()
         );
 
-        /*
-         * 10秒後に確認を無効化
-         */
+        // 10秒後に確認を無効化
         new BukkitRunnable() {
-
             @Override
             public void run() {
 
                 PendingInsert current =
-                        pending.get(
-                                player.getUniqueId()
-                        );
+                        pending.get(player.getUniqueId());
 
                 if (current != null
                         && current.token.equals(token)) {
 
-                    pending.remove(
-                            player.getUniqueId()
-                    );
+                    pending.remove(player.getUniqueId());
 
                     if (player.isOnline()) {
-
                         player.sendMessage(
                                 plugin.color(
-                                        "&7空スキルの挿入確認がタイムアウトしました。"
+                                        "&7Optionsの挿入確認がタイムアウトしました。"
                                 )
                         );
                     }
                 }
             }
-
-        }.runTaskLater(
-                plugin,
-                20L * 10
-        );
+        }.runTaskLater(plugin, 20L * 10);
     }
 
-
-    public void confirm(
-            Player player,
-            String tokenString) {
+    public void confirm(Player player, String tokenString) {
 
         PendingInsert data =
-                pending.get(
-                        player.getUniqueId()
-                );
+                pending.get(player.getUniqueId());
 
         if (data == null) {
-
             player.sendMessage(
                     plugin.color(
                             "&c確認が期限切れです。もう一度実行してください。"
                     )
             );
-
             return;
         }
 
-        if (!data.token.toString()
-                .equalsIgnoreCase(tokenString)) {
-
+        if (!data.token.toString().equalsIgnoreCase(tokenString)) {
             player.sendMessage(
                     plugin.color(
                             "&c無効な確認です。"
                     )
             );
-
             return;
         }
 
-        /*
-         * 先に削除。
-         * 同じ確認を2回クリックできないようにする。
-         */
-        pending.remove(
-                player.getUniqueId()
-        );
+        // 同じ確認を二度実行できないようにする
+        pending.remove(player.getUniqueId());
 
         File file =
-                plugin.getMythicItemFile(
-                        data.filePath
-                );
+                plugin.getMythicItemFile(data.filePath);
 
-        if (file == null || !file.exists()) {
-
+        if (file == null || !file.isFile()) {
             player.sendMessage(
                     plugin.color(
                             "&c対象YAMLファイルが見つかりません。"
                     )
             );
-
             return;
         }
 
@@ -333,35 +320,25 @@ public class EmptySkillManager {
                 new YamlConfiguration();
 
         try {
-
             yaml.load(file);
-
         } catch (Exception e) {
-
             player.sendMessage(
                     plugin.color(
                             "&c対象YAMLを読み込めませんでした。"
                     )
             );
-
             return;
         }
 
-        /*
-         * もう一度Skillsを確認。
-         *
-         * 確認メッセージを出したあとに
-         * 別の場所からスキルが追加されていた場合、
-         * 絶対に上書きしない。
-         */
-        if (hasActualSkills(
-                yaml,
-                data.mythicId
-        )) {
+        String optionPath =
+                data.mythicId + ".Options." + data.option;
 
+        if (yaml.contains(optionPath)) {
             player.sendMessage(
                     plugin.color(
-                            "&eこのアイテムには既にスキルが設定されています。"
+                            "&cこのアイテムには既にOptions."
+                                    + data.option
+                                    + "が記述されています。"
                     )
             );
 
@@ -370,32 +347,17 @@ public class EmptySkillManager {
                             "&7ファイルは変更していません。"
                     )
             );
-
             return;
         }
 
-        /*
-         * Skills:
-         * - delay 0
-         */
-        List<String> skills =
-                new java.util.ArrayList<>();
-
-        skills.add("delay 0");
-
-        yaml.set(
-                data.mythicId + ".Skills",
-                skills
-        );
+        yaml.set(optionPath, true);
 
         try {
-
             yaml.save(file);
-
         } catch (IOException e) {
 
             plugin.getLogger().severe(
-                    "空スキルの挿入に失敗しました: "
+                    "Optionsの挿入に失敗しました: "
                             + file.getName()
             );
 
@@ -403,49 +365,48 @@ public class EmptySkillManager {
 
             player.sendMessage(
                     plugin.color(
-                            "&c空スキルの挿入に失敗しました。"
+                            "&cOptionsの挿入に失敗しました。"
                     )
             );
-
             return;
         }
 
         player.sendMessage(
                 plugin.color(
-                        "&a空スキルを挿入しました！"
+                        "&aOptionsを挿入しました！"
                 )
         );
 
         player.sendMessage(
                 plugin.color(
-                        "&7MMID: &f"
-                                + data.mythicId
+                        "&7MMID: &f" + data.mythicId
                 )
         );
 
         player.sendMessage(
                 plugin.color(
-                        "&7追加内容: &fSkills: - delay 0"
+                        "&7追加内容: &fOptions."
+                                + data.option
+                                + ": true"
                 )
         );
     }
 
-    private boolean hasActualSkills(
-            YamlConfiguration yaml,
-            String mythicId) {
+    private String normalizeOption(String option) {
 
-        String path =
-                mythicId + ".Skills";
-
-        if (!yaml.contains(path)) {
-            return false;
+        if (option == null) {
+            return null;
         }
 
-        List<String> skills =
-                yaml.getStringList(path);
+        if (option.equalsIgnoreCase("Unbreakable")) {
+            return "Unbreakable";
+        }
 
-        return skills != null
-                && !skills.isEmpty();
+        if (option.equalsIgnoreCase("AppendType")) {
+            return "AppendType";
+        }
+
+        return null;
     }
 
     private static class PendingInsert {
@@ -453,18 +414,19 @@ public class EmptySkillManager {
         private final UUID token;
         private final String mythicId;
         private final String filePath;
-        private final ItemStack item;
+        private final String option;
 
         private PendingInsert(
                 UUID token,
                 String mythicId,
                 String filePath,
-                ItemStack item) {
+                String option) {
 
             this.token = token;
             this.mythicId = mythicId;
             this.filePath = filePath;
-            this.item = item;
+            this.option = option;
         }
     }
+
 }
